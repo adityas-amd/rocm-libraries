@@ -85,6 +85,7 @@ target_sources(rocroller-tests-catch
         "${_CMAKE_CURRENT_SOURCE_DIR}/LargerLDSTest.cpp"
         "${_CMAKE_CURRENT_SOURCE_DIR}/LoadPackedTest.cpp"
         "${_CMAKE_CURRENT_SOURCE_DIR}/MEMObserverTest.cpp"
+        "${_CMAKE_CURRENT_SOURCE_DIR}/MemoryTracerTest.cpp"
         "${_CMAKE_CURRENT_SOURCE_DIR}/MultipleLDSAllocationTest.cpp"
         "${_CMAKE_CURRENT_SOURCE_DIR}/RandomNumberExpressionTest.cpp"
         "${_CMAKE_CURRENT_SOURCE_DIR}/RandomNumberGenerationTest.cpp"
