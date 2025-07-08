@@ -2336,7 +2336,7 @@ class KernelWriterAssembly(KernelWriter):
           module.add(SBranch(wgmLabel.getLabelName()))
     module.add(wgmLabel)
 
-    if kernel["StreamK"] > 0:  
+    if kernel["StreamK"] > 0:
       self.sgprPool.checkIn(tmpSgpr)
     tmpVgprRes = None
     self.vgprPool.checkIn(tmpVgpr)
@@ -2554,19 +2554,37 @@ class KernelWriterAssembly(KernelWriter):
             module.add(VMovB32(dst=vgpr(swzBlkVWSizeVgpr), src=sgpr(swzBlkVWSizeSgpr)))
             module.add(VMulU32U24(dst=vgpr(v), src0=vgpr(v), src1=vgpr(swzBlkVWSizeVgpr)))
 
-            module.addComment0("swzStridePerWave = (number of swizzle block in K) * WaveGroup_MorN")
-            module.add(SAddU32(sgpr(swzStridePerWave), sgpr("SizesSum"), swzStride - 1, comment=f"Align to {swzStride}")),
-            module.add(SLShiftRightB32(dst=sgpr(swzStridePerWave), src=sgpr(swzStridePerWave), shiftHex=hex(log2(swzStride)),
-                                      comment="numKr = DimK / swizzleK")),
-            module.add(SMulI32(dst=sgpr(swzStridePerWave), src0=hex(WvG_MorN), src1=sgpr(swzStridePerWave),
-                              comment="numKr *= MI_WaveGroup, wave-M (SWZ-A) or wave-N (SWZ-B)"))
+            # LSU part
+            lsu       = kernel["LocalSplitU"]
+            if lsu > 1:
+              tmpVgprRes = None
+              wave_id    = self.vgprPool.checkOut(1) # quotient
+              # constant
+              du         = kernel["DepthU"]
+              lsuStride  = du // lsu
+              numWaves   = kernel["MIWaveGroup"][0] * kernel["MIWaveGroup"][1]
+              # codes
+              module.add(vectorStaticDivide(wave_id, "Serial", kernel["WavefrontSize"], tmpVgprRes))
+              module.add(vectorStaticDivide(wave_id, wave_id, numWaves, tmpVgprRes, comment="LSU offset: Get LSU wave_id"))
+              module.add(VLShiftLeftB32(dst=vgpr(wave_id), shiftHex=hex(log2(lsuStride*16)), src=vgpr(wave_id), comment="LSU offset: LSU_wave_id*MI_M(%u)*lsuStrideK(%u)"%(16, lsuStride)))
+              module.add(VAddU32(dst=vgpr(v), src0=vgpr(wave_id), src1=vgpr(v), comment="tileOffset += LSU offset"))
+              self.vgprPool.checkIn(wave_id)
 
-            module.addComment0("swzBlkVWOffset = swzBlkWvGSize - laneSize * (VW - 1)")
-            module.add(SMulI32(dst=sgpr(swzBlkVWSizeSgpr), src0=sgpr(swzStridePerWave), src1=sgpr(swzBlkVWSizeSgpr), \
-              comment="swzBlkWvGSize = numKr * (swzBlockSize * VW)"))
-            module.add(SSubU32(dst=sgpr(swzBlkVWSizeSgpr), src0=sgpr(swzBlkVWSizeSgpr), src1=(laneSize * (vw - 1)), \
-              comment="swzBlkVWOffset = swzBlkWvGSize - laneSize * (VW - 1)"))
-            module.add(VMovB32(dst=vgpr(swzBlkVWSizeVgpr), src=sgpr(swzBlkVWSizeSgpr)) )
+            # don't emit the code if we don't need to do more than one nrt
+            if tP["nrt"] > 1:
+              module.addComment0("swzStridePerWave = (number of swizzle block in K) * WaveGroup_MorN")
+              module.add(SAddU32(sgpr(swzStridePerWave), sgpr("SizesSum"), swzStride - 1, comment=f"Align to {swzStride}")),
+              module.add(SLShiftRightB32(dst=sgpr(swzStridePerWave), src=sgpr(swzStridePerWave), shiftHex=hex(log2(swzStride)),
+                                        comment="numKr = DimK / swizzleK")),
+              module.add(SMulI32(dst=sgpr(swzStridePerWave), src0=hex(WvG_MorN), src1=sgpr(swzStridePerWave),
+                                comment="numKr *= MI_WaveGroup, wave-M (SWZ-A) or wave-N (SWZ-B)"))
+
+              module.addComment0("swzBlkVWOffset = swzBlkWvGSize - laneSize * (VW - 1)")
+              module.add(SMulI32(dst=sgpr(swzBlkVWSizeSgpr), src0=sgpr(swzStridePerWave), src1=sgpr(swzBlkVWSizeSgpr), \
+                comment="swzBlkWvGSize = numKr * (swzBlockSize * VW)"))
+              module.add(SSubU32(dst=sgpr(swzBlkVWSizeSgpr), src0=sgpr(swzBlkVWSizeSgpr), src1=(laneSize * (vw - 1)), \
+                comment="swzBlkVWOffset = swzBlkWvGSize - laneSize * (VW - 1)"))
+              module.add(VMovB32(dst=vgpr(swzBlkVWSizeVgpr), src=sgpr(swzBlkVWSizeSgpr)) )
 
       for l in range(1, tP["nrt"]):
         strideValue = stride
@@ -2577,9 +2595,11 @@ class KernelWriterAssembly(KernelWriter):
             src1=vgpr(v+l-1), comment="gro%s%s_%u += %s"%(tP["tensorChar"], tP["tileChar"], l, strideIdx) ))
         # swizzle
         else:
+          # VW > 1
           if (strideInterleave and (l & strideMask) != 0):
             module.add(VAddCOU32(dst=vgpr(v+l), dst1=VCC(), src0=laneSize, \
               src1=vgpr(v+l-1), comment="SWZ-%s: gro%s%s_%u"%(tc, tP["tensorChar"], tP["tileChar"], l) ))
+          # VW == 1
           else:
             module.add(VAddCOU32(dst=vgpr(v+l), dst1=VCC(), src0=vgpr(swzBlkVWSizeVgpr), \
               src1=vgpr(v+l-1), comment="SWZ-%s: gro%s%s_%u"%(tc, tP["tensorChar"], tP["tileChar"], l) ))
@@ -2901,17 +2921,6 @@ class KernelWriterAssembly(KernelWriter):
     graIdx = 0
     swapPerpPara = (((tP["isA"] or tP["isB"]) and kernel["DirectToVgpr%s"%tc]) and (not tP["tlu"]) and tP["nrp"] > 1)
 
-    # swizzle
-    if tP["isSwizzled"]:
-      swizzleK = tP["swizzleK"]
-      tP["swizzledBlockSize"] = self.sgprPool.checkOut(1)
-      if tc == "A":
-        commentMsg = "SWZ-%s: swizzled block = MI_M(%u) * MI_K(%u) * pack-K(%u)" %(tc, 16, kernel["MatrixInstK"], tP["swizzlePackK"])
-      elif tc == "B":
-        commentMsg = "SWZ-%s: swizzled block = MI_N(%u) * MI_K(%u) * pack-K(%u)" %(tc, 16, kernel["MatrixInstK"], tP["swizzlePackK"])
-
-      module.add(SMovB32(dst=sgpr(tP["swizzledBlockSize"]), src=hex(16*swizzleK), comment=commentMsg))
-
     # both UseSgprForGRO and DTVA/B are enabled
     if ((tP["isA"] or tP["isB"]) and kernel["DirectToVgpr%s"%tc]) and kernel["_UseSgprForGRO"]:
       if tP["tlu"]:
@@ -2953,9 +2962,6 @@ class KernelWriterAssembly(KernelWriter):
               # single loop
               singleModule, graIdx = self.graFinalOffsetsSingleLoop(kernel, tP, tc, tmp, graIdx, perp, sPerp, para, sPara)
               module.add(singleModule)
-
-    if tP["isSwizzled"]:
-      self.sgprPool.checkIn(tP["swizzledBlockSize"])
 
     self.vgprPool.checkIn(tP["gpr"]["lwoT"])
     tP["gpr"]["lwoT"] = None
@@ -3666,9 +3672,12 @@ class KernelWriterAssembly(KernelWriter):
         tmpSgpr = tmpSgprInfo.idx
         # Calc numKr
         swzStride = tP["swizzleK"]
+        lsu = kernel["LocalSplitU"]
+        swzStrideLSU = swzStride * lsu
+        # TODO - align to swzStride or swzStrideLSU ?
         module.addComment(f"Align to {swzStride}")
         module.add(SAddU32(sgpr(tmpSgpr), sgpr("SizesSum"), swzStride-1))
-        module.add(SLShiftRightB32(dst=sgpr(tmpSgpr), shiftHex=hex(log2(swzStride)), src=sgpr(tmpSgpr),  comment="SWZ-%s: numKr = DimK / %s"%(tc, swzStride)))
+        module.add(SLShiftRightB32(dst=sgpr(tmpSgpr), shiftHex=hex(log2(swzStrideLSU)), src=sgpr(tmpSgpr),  comment="SWZ-%s: numKr = DimK / (%s * LSU(%s))"%(tc, swzStride, lsu)))
         WvG_M = kernel["MIWaveGroup"][0]
         if tP["isA"]:
           module.add(VAndB32(dst=vgpr(qReg), src0=hex(WvG_M-1), src1=vgpr(qReg), comment="SWZ-%s: wave_id (along_M) mod MIWG[0]"%tc))
@@ -11489,7 +11498,7 @@ class KernelWriterAssembly(KernelWriter):
         # module.add(SMovB64(dst=sgpr("SrdTD+0", 2), src=sgpr("SrdD+0", 2), comment="SrdTD = SrdD for GSU == 1"))
         # module.add(SMovB64(dst=sgpr("SrdTD+2", 2), src=sgpr("SrdD+2", 2), comment="SrdTD = SrdD for GSU == 1"))
         # module.add(SBranch(labelName=reductionEndLabel.getLabelName(), comment="branch if GSU == 1"))
-        
+
       gsuComponent = Component.GSU.find(self)
       if kernel["GlobalSplitU"] > 1 and kernel["GlobalSplitUAlgorithm"] == "MultipleBufferSingleKernel":
         self.defineSgpr("GSUStartWGIdx", 1)
@@ -11752,7 +11761,7 @@ class KernelWriterAssembly(KernelWriter):
       if maxVgprs != maxVgprsN:
         #print("refineOccupancy maxVgprs, new", maxVgprsN, "old", maxVgprs)
         return self.refineOccupancy(kernel, atomic, elements, actPCMaxTempSgpr, edgeI, gwvw, maxVgprsN, ss)
-  
+
     # # Get true numVgprAvailable
     # numVgprAvailable = self.vgprPool.availableBlock(ss.numVgprsPerElement, ss.align)
     # print("Available vgprs =", numVgprAvailable, "pool size =", self.vgprPool.size())
@@ -11769,7 +11778,7 @@ class KernelWriterAssembly(KernelWriter):
       #print("refineOccupancy maxVgprs, new", maxVgprsN, "old", maxVgprs)
       return self.refineOccupancy(kernel, atomic, elements, actPCMaxTempSgpr, edgeI, gwvw, maxVgprsN, ss)
     return numElementsPerBatch, nBatchesPerRow, numBatches, numSgprs
-    
+
 
   ##############################################################################
   # globalWriteElementBatch :

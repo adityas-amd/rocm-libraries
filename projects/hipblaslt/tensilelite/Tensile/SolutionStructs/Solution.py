@@ -582,18 +582,19 @@ class Solution(collections.abc.Mapping):
   # determine can we use DirectToVgpr
   @staticmethod
   def isDirectToVgprDoable(state, tc, printRejectionReason: bool, isaInfoMap: Dict[str, IsaInfo]):
-    MIindex = 0 if tc == 'A' else 1
     numBytes = state["ProblemType"]["DataType"].numBytes()
     numBytesGR = state["ProblemType"]["DataType%s"%tc].numBytes()
+    isSwizzle = state["ProblemType"]["SwizzleTensor%s"%tc]
+
     # With MatrixInstruction only
     if not state["EnableMatrixInstruction"] :
       reject(state, printRejectionReason, "DirectToVgpr is for MatrixInstruction only")
       return False
 
     # disable the following combinations for initial implementation
-    # TODO: enable them
-    if state["LocalSplitU"] != 1 and (not state["ProblemType"]["TLU%c"%tc]):
-      reject(state, printRejectionReason, "DirectToVgpr + LSU + TLU=False has not been enabled yet(tentative)")
+    # TODO: enable them (for pure DTV)
+    if (state["LocalSplitU"] != 1) and (not state["ProblemType"]["TLU%c"%tc]) and (not isSwizzle):
+      reject(state, printRejectionReason, "Non-Swizzled DirectToVgpr + LSU + TLU=False has not been enabled yet(tentative)")
       return False
 
     if state["DirectToVgprA"] and state["DirectToVgprB"]:
