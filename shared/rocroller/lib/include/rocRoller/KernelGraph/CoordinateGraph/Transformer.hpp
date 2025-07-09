@@ -108,6 +108,11 @@ namespace rocRoller
              */
             void fillExecutionCoordinates(ContextPtr context);
 
+            void fillExecutionCoordinates(
+                ContextPtr                                      context,
+                std::array<Expression::ExpressionPtr, 3> const& kernelWorkgroupIndexes,
+                std::array<Expression::ExpressionPtr, 3> const& kernelWorkitemIndexes);
+
         private:
             Expression::ExpressionPtr transduce(Expression::ExpressionPtr exp) const;
             std::vector<Expression::ExpressionPtr>

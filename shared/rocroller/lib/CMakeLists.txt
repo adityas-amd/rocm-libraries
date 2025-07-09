@@ -205,6 +205,7 @@ set(rocroller_src
     source/KernelGraph/Transformations/LowerTensorContraction.cpp
     source/KernelGraph/Transformations/LowerTile.cpp
     source/KernelGraph/Transformations/NopExtraScopes.cpp
+    source/KernelGraph/Transformations/MemoryTracer.cpp
     source/KernelGraph/Transformations/OrderEpilogueBlocks.cpp
     source/KernelGraph/Transformations/OrderMemory.cpp
     source/KernelGraph/Transformations/OrderMultiplyNodes.cpp

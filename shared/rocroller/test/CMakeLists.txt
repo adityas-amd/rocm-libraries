@@ -190,6 +190,7 @@ set(
     catch/LargerLDSTest.cpp
     catch/LoadPackedTest.cpp
     catch/MEMObserverTest.cpp
+    catch/MemoryTracerTest.cpp
     catch/MultipleLDSAllocationTest.cpp
     catch/RandomNumberExpressionTest.cpp
     catch/RandomNumberGenerationTest.cpp
