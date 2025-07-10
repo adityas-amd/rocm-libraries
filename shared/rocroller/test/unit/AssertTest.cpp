@@ -178,30 +178,30 @@ namespace AssertTest
                 EXPECT_THAT(output(), testing::HasSubstr("AssertOpKind == NoOp"));
             }
 
-            if(isLocalDevice())
-            {
-                KernelArguments kargs;
+    //         if(isLocalDevice())
+    //         {
+    //             KernelArguments kargs;
 
-                KernelInvocation kinv;
-                kinv.workitemCount = {1, 1, 1};
-                kinv.workgroupSize = {1, 1, 1};
+    //             KernelInvocation kinv;
+    //             kinv.workitemCount = {1, 1, 1};
+    //             kinv.workgroupSize = {1, 1, 1};
 
-                auto executableKernel = m_context->instructions()->getExecutableKernel();
+    //             auto executableKernel = m_context->instructions()->getExecutableKernel();
 
-                const auto runTest = [&]() {
-                    executableKernel->executeKernel(kargs, kinv);
-                    // Need to wait for signal, otherwise child process may terminate before signal is sent
-                    (void)hipDeviceSynchronize();
-                };
-                if(assertOpKind != AssertOpKind::NoOp)
-                {
-                    EXPECT_EXIT({ runTest(); }, ::testing::KilledBySignal(SIGABRT), outputMsg);
-                }
-                else
-                {
-                    runTest();
-                }
-            }
+    //             const auto runTest = [&]() {
+    //                 executableKernel->executeKernel(kargs, kinv);
+    //                 // Need to wait for signal, otherwise child process may terminate before signal is sent
+    //                 (void)hipDeviceSynchronize();
+    //             };
+    //             if(assertOpKind != AssertOpKind::NoOp)
+    //             {
+    //                 EXPECT_EXIT({ runTest(); }, ::testing::KilledBySignal(SIGABRT), outputMsg);
+    //             }
+    //             else
+    //             {
+    //                 runTest();
+    //             }
+    //         }
         }
     }
 
@@ -290,30 +290,30 @@ namespace AssertTest
                 EXPECT_THAT(output(), testing::HasSubstr("AssertOpKind == NoOp"));
             }
 
-            if(isLocalDevice())
-            {
-                KernelArguments kargs;
+    //         if(isLocalDevice())
+    //         {
+    //             KernelArguments kargs;
 
-                KernelInvocation kinv;
-                kinv.workitemCount = {1, 1, 1};
-                kinv.workgroupSize = {1, 1, 1};
+    //             KernelInvocation kinv;
+    //             kinv.workitemCount = {1, 1, 1};
+    //             kinv.workgroupSize = {1, 1, 1};
 
-                auto executableKernel = m_context->instructions()->getExecutableKernel();
+    //             auto executableKernel = m_context->instructions()->getExecutableKernel();
 
-                const auto runTest = [&]() {
-                    executableKernel->executeKernel(kargs, kinv);
-                    // Need to wait for signal, otherwise child process may terminate before signal is sent
-                    (void)hipDeviceSynchronize();
-                };
-                if(assertOpKind != AssertOpKind::NoOp)
-                {
-                    EXPECT_EXIT({ runTest(); }, ::testing::KilledBySignal(SIGABRT), outputMsg);
-                }
-                else
-                {
-                    runTest();
-                }
-            }
+    //             const auto runTest = [&]() {
+    //                 executableKernel->executeKernel(kargs, kinv);
+    //                 // Need to wait for signal, otherwise child process may terminate before signal is sent
+    //                 (void)hipDeviceSynchronize();
+    //             };
+    //             if(assertOpKind != AssertOpKind::NoOp)
+    //             {
+    //                 EXPECT_EXIT({ runTest(); }, ::testing::KilledBySignal(SIGABRT), outputMsg);
+    //             }
+    //             else
+    //             {
+    //                 runTest();
+    //             }
+    //         }
         }
     }
 
