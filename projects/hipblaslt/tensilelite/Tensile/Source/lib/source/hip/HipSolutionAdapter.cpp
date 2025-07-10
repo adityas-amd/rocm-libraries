@@ -269,8 +269,10 @@ namespace TensileLite
         // avoid separating construction and initialization
         void SolutionAdapter::codeObjectDir(std::string codeObjectDir)
         {
-            if(codeObjectDir.back() != '/');
+            if(codeObjectDir.back() != '/')
+            {
                 codeObjectDir += '/';
+            }
             m_access.lock();
             m_codeObjectDirectory = codeObjectDir;
             m_access.unlock();
