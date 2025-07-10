@@ -2530,6 +2530,7 @@ class KernelWriterAssembly(KernelWriter):
         if not tP["isSwizzled"]:
           module.add(VMovB32(dst=vgpr(v), src=vgpr(tP["gpr"]["tReg"]), comment="gro%s%s_%u"%(tP["tensorChar"], tP["tileChar"], 0) ))
         else:
+          lsu = kernel["LocalSplitU"] # localSplitU
           if tP["isA"]:
             WvG_MorN = kernel["MIWaveGroup"][0]
             swzMorN = kernel["MatrixInstM"]
@@ -2541,7 +2542,6 @@ class KernelWriterAssembly(KernelWriter):
           vw = kernel[f"VectorWidth{tc}"]
           kPack = tP["swizzlePackK"]
           laneSize = int(kernel["MatrixInstK"] / 4) * kPack  # the size of one swizzle's lane
-          lsu = kernel["LocalSplitU"] # localSplitU
 
           with self.allocTmpSgpr(2) as tmpSgprInfo:
             swzBlkVWSizeSgpr = tmpSgprInfo.idx
@@ -2573,9 +2573,12 @@ class KernelWriterAssembly(KernelWriter):
             # don't emit the code if we don't need to do more than one nrt
             if tP["nrt"] > 1:
               module.addComment0("swzStridePerWave = (number of swizzle block in K) * WaveGroup_MorN")
-              module.add(SAddU32(sgpr(swzStridePerWave), sgpr("SizesSum"), swzStride - 1, comment=f"Align to {swzStride}")),
-              module.add(SLShiftRightB32(dst=sgpr(swzStridePerWave), src=sgpr(swzStridePerWave), shiftHex=hex(log2(swzStride)),
-                                        comment="numKr = DimK / swizzleK")),
+              swzStrideLSU = swzStride * lsu
+              # TODO - align to swzStride or swzStrideLSU ?
+              module.addComment(f"Align to {swzStride}")
+              module.add(SAddU32(sgpr(swzStridePerWave), sgpr("SizesSum"), swzStride-1)),
+              module.add(SLShiftRightB32(dst=sgpr(swzStridePerWave), src=sgpr(swzStridePerWave), shiftHex=hex(log2(swzStrideLSU)),
+                                        comment="numKr = DimK / (swizzleK * LSU)")),
               module.add(SMulI32(dst=sgpr(swzStridePerWave), src0=hex(WvG_MorN), src1=sgpr(swzStridePerWave),
                                 comment="numKr *= MI_WaveGroup, wave-M (SWZ-A) or wave-N (SWZ-B)"))
 
