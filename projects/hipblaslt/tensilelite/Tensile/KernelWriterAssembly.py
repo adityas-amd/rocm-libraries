@@ -2541,6 +2541,7 @@ class KernelWriterAssembly(KernelWriter):
           vw = kernel[f"VectorWidth{tc}"]
           kPack = tP["swizzlePackK"]
           laneSize = int(kernel["MatrixInstK"] / 4) * kPack  # the size of one swizzle's lane
+          lsu = kernel["LocalSplitU"] # localSplitU
 
           with self.allocTmpSgpr(2) as tmpSgprInfo:
             swzBlkVWSizeSgpr = tmpSgprInfo.idx
@@ -2549,13 +2550,12 @@ class KernelWriterAssembly(KernelWriter):
             module.addComment0("SWZ-%s: calculation of gro%s%s_%u"%(tc, tP["tensorChar"], tP["tileChar"], 0))
             module.add(VMovB32(dst=vgpr(v), src=vgpr(tP["gpr"]["tReg"])))
             swzBlkVWSizeVgpr = self.vgprPool.checkOut(1)
-            module.add(SMovB32(dst=sgpr(swzBlkVWSizeSgpr), src=hex(swzBlockSize * vw), \
-              comment="swizzled block * VW = (MI_M(%u) * MI_K(%u) * kPack) * VW(%u)" %(swzMorN, int(swzStride / kPack), vw)))
+            module.add(SMovB32(dst=sgpr(swzBlkVWSizeSgpr), src=hex(swzBlockSize * vw * lsu), \
+              comment="swizzled block * VW * LSU = (MI_M(%u) * MI_K(%u) * kPack) * VW(%u) * LSU(%u)" %(swzMorN, int(swzStride / kPack), vw, lsu)))
             module.add(VMovB32(dst=vgpr(swzBlkVWSizeVgpr), src=sgpr(swzBlkVWSizeSgpr)))
             module.add(VMulU32U24(dst=vgpr(v), src0=vgpr(v), src1=vgpr(swzBlkVWSizeVgpr)))
 
             # LSU part
-            lsu       = kernel["LocalSplitU"]
             if lsu > 1:
               tmpVgprRes = None
               wave_id    = self.vgprPool.checkOut(1) # quotient
